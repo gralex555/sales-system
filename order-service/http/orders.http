@@ -1,0 +1,11 @@
+### Создать заказ
+POST http://localhost:8081/api/v1/orders
+Content-Type: application/json
+
+{
+  "customerId": 42,
+  "items": [
+    { "productId": 1, "quantity": 100 },
+    { "productId": 2, "quantity": 50 }
+  ]
+}
