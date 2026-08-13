@@ -9,6 +9,8 @@ import com.sales.order.entity.OrderItem;
 import com.sales.order.entity.OrderStatus;
 import com.sales.order.exception.OrderNotFoundException;
 import com.sales.order.repository.OrderRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -87,9 +89,8 @@ public class OrderService {
         return mapToResponse(order);
     }
 
-    public List<OrderResponse> getAllOrders() {
-        return orderRepository.findAllWithItems().stream()
-                .map(this::mapToResponse)
-                .toList();
+    public Page<OrderResponse> getAllOrders(Pageable pageable) {
+        return orderRepository.findAll(pageable)
+                .map(this::mapToResponse);
     }
 }

@@ -4,6 +4,8 @@ import com.sales.order.dto.CreateOrderRequest;
 import com.sales.order.dto.OrderResponse;
 import com.sales.order.service.OrderService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,8 +34,8 @@ public class OrderController {
     }
 
     @GetMapping
-    public ResponseEntity<List<OrderResponse>> getAllOrders() {
-        List<OrderResponse> responses = orderService.getAllOrders();
+    public ResponseEntity<Page<OrderResponse>> getAllOrders(Pageable pageable) {
+        Page<OrderResponse> responses = orderService.getAllOrders(pageable);
         return ResponseEntity.ok(responses);
     }
 }
