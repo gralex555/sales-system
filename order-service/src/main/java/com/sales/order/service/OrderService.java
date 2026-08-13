@@ -7,6 +7,7 @@ import com.sales.order.dto.OrderResponse;
 import com.sales.order.entity.Order;
 import com.sales.order.entity.OrderItem;
 import com.sales.order.entity.OrderStatus;
+import com.sales.order.exception.OrderNotFoundException;
 import com.sales.order.repository.OrderRepository;
 import org.springframework.stereotype.Service;
 
@@ -78,5 +79,17 @@ public class OrderService {
         response.setItems(itemResponses);
 
         return response;
+    }
+
+    public OrderResponse getOrderById(Long id) {
+        Order order = orderRepository.findByIdWithItems(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+        return mapToResponse(order);
+    }
+
+    public List<OrderResponse> getAllOrders() {
+        return orderRepository.findAllWithItems().stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 }
