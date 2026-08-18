@@ -4,11 +4,13 @@ import com.sales.product.dto.CreateProductRequest;
 import com.sales.product.dto.ProductResponse;
 import com.sales.product.entity.Product;
 
+import com.sales.product.entity.ReservationResult;
 import com.sales.product.exception.ProductNotFoundException;
 import com.sales.product.repository.ProductRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProductService {
@@ -48,6 +50,20 @@ public class ProductService {
     public Page<ProductResponse> getAllProducts(Pageable pageable) {
         return productRepository.findAll(pageable)
                 .map(this::mapToResponse);
+    }
+
+    @Transactional
+    public ReservationResult reserveStock(Long productId, Integer quantity) {
+        // проверим, что товар вообще существует
+        if (!productRepository.existsById(productId)) {
+            throw new ProductNotFoundException(productId);
+        }
+
+        int updated = productRepository.reserveStock(productId, quantity);
+
+        return updated > 0
+                ? ReservationResult.SUCCESS
+                : ReservationResult.INSUFFICIENT_STOCK;
     }
 
 }

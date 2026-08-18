@@ -2,6 +2,8 @@ package com.sales.product.controller;
 
 import com.sales.product.dto.CreateProductRequest;
 import com.sales.product.dto.ProductResponse;
+import com.sales.product.dto.ReserveStockRequest;
+import com.sales.product.entity.ReservationResult;
 import com.sales.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -45,5 +47,22 @@ public class ProductController {
     public ResponseEntity<Page<ProductResponse>> getAllProducts(Pageable pageable) {
         Page<ProductResponse> responses = productService.getAllProducts(pageable);
         return ResponseEntity.ok(responses);
+    }
+
+    @Operation(summary = "Reserve product stock")
+    @ApiResponse(responseCode = "200", description = "Stock reserved")
+    @ApiResponse(responseCode = "409", description = "Insufficient stock")
+    @ApiResponse(responseCode = "404", description = "Product not found")
+    @PostMapping("/{id}/reserve")
+    public ResponseEntity<Void> reserveStock(
+            @PathVariable Long id,
+            @Valid @RequestBody ReserveStockRequest request) {
+
+        ReservationResult result = productService.reserveStock(id, request.getQuantity());
+
+        if (result == ReservationResult.SUCCESS) {
+            return ResponseEntity.ok().build();
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
 }
