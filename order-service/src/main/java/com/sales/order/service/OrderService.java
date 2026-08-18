@@ -1,5 +1,7 @@
 package com.sales.order.service;
 
+import com.sales.order.client.ProductServiceClient;
+import com.sales.order.client.dto.ProductInfo;
 import com.sales.order.dto.CreateOrderRequest;
 import com.sales.order.dto.OrderItemRequest;
 import com.sales.order.dto.OrderItemResponse;
@@ -21,45 +23,45 @@ import java.util.List;
 @Service
 public class OrderService {
     private final OrderRepository orderRepository;
+    private final ProductServiceClient productServiceClient;
 
-    public OrderService(OrderRepository orderRepository) {
+    public OrderService(OrderRepository orderRepository,
+                        ProductServiceClient productServiceClient) {
         this.orderRepository = orderRepository;
+        this.productServiceClient = productServiceClient;
     }
 
     public OrderResponse createOrder(CreateOrderRequest request) {
         Order order = new Order();
         order.setCustomerId(request.getCustomerId());
-        order.setStatus(OrderStatus.CREATED);
         order.setCreatedAt(LocalDateTime.now());
 
         BigDecimal totalAmount = BigDecimal.ZERO;    // накопитель суммы
 
         for (OrderItemRequest itemRequest : request.getItems()) {
+
+            ProductInfo product = productServiceClient.getProduct(itemRequest.getProductId());
+            BigDecimal price = product.getPrice();
+
+            productServiceClient.reserveStock(itemRequest.getProductId(), itemRequest.getQuantity());
+
             OrderItem item = new OrderItem();
             item.setProductId(itemRequest.getProductId());
             item.setQuantity(itemRequest.getQuantity());
-
-            BigDecimal price = getPriceForProduct(itemRequest.getProductId());  // цена (заглушка пока)
             item.setPrice(price);
-
             item.setOrder(order);
             order.getItems().add(item);
 
-            // накопить сумму: цена × количество
             BigDecimal itemTotal = price.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             totalAmount = totalAmount.add(itemTotal);
+
         }
 
         order.setTotalAmount(totalAmount);
+        order.setStatus(OrderStatus.RESERVED);
 
         Order savedOrder = orderRepository.save(order);
         return mapToResponse(savedOrder);
-    }
-
-    private BigDecimal getPriceForProduct(Long productId) {
-        // ЗАГЛУШКА: пока product-service нет, возвращаем условную цену
-        // На Этапе 2 заменим реальным запросом в product-service
-        return BigDecimal.valueOf(100);
     }
 
     private OrderResponse mapToResponse(Order order) {
