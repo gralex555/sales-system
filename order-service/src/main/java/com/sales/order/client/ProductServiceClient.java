@@ -4,8 +4,10 @@ import com.sales.order.client.dto.ProductInfo;
 import com.sales.order.client.dto.ReserveStockRequest;
 import com.sales.order.exception.InsufficientStockException;
 import com.sales.order.exception.ProductNotAvailableException;
+import com.sales.order.exception.ProductServiceUnavailableException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 @Component
@@ -24,6 +26,9 @@ public class ProductServiceClient {
                     .body(ProductInfo.class);
         } catch (HttpClientErrorException.NotFound ex) {
             throw new ProductNotAvailableException(productId);
+        } catch (ResourceAccessException ex) {
+            throw new ProductServiceUnavailableException(
+                    "Product service is unavailable", ex);
         }
     }
 
@@ -39,6 +44,11 @@ public class ProductServiceClient {
             throw new ProductNotAvailableException(productId);
         } catch (HttpClientErrorException.Conflict ex) {
             throw new InsufficientStockException(productId, quantity);
+        } catch (ResourceAccessException ex) {
+            throw new ProductServiceUnavailableException(
+                    "Product service is unavailable", ex);
         }
+
     }
+
 }

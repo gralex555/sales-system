@@ -23,3 +23,5 @@ server:
 services:
   product:
     url: ${PRODUCT_SERVICE_URL:http://localhost:8082}
+    connect-timeout: 2s
+    read-timeout: 5s

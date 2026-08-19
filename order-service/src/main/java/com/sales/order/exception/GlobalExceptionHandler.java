@@ -95,4 +95,21 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
+
+    @ExceptionHandler(ProductServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleServiceUnavailable(
+            ProductServiceUnavailableException ex,
+            HttpServletRequest request) {
+
+        log.error("Product service unavailable", ex);
+
+        ErrorResponse error = new ErrorResponse();
+        error.setTimestamp(LocalDateTime.now());
+        error.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+        error.setError("Service Unavailable");
+        error.setMessage("Product service is temporarily unavailable, please try again later");
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
+    }
 }
