@@ -5,6 +5,7 @@ import com.sales.order.client.dto.ReserveStockRequest;
 import com.sales.order.exception.InsufficientStockException;
 import com.sales.order.exception.ProductNotAvailableException;
 import com.sales.order.exception.ProductServiceUnavailableException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
@@ -18,6 +19,7 @@ public class ProductServiceClient {
         this.restClient = productRestClient;
     }
 
+    @CircuitBreaker(name = "productService", fallbackMethod = "getProductFallback")
     public ProductInfo getProduct(Long productId) {
         try {
             return restClient.get()
@@ -32,7 +34,13 @@ public class ProductServiceClient {
         }
     }
 
+    private ProductInfo getProductFallback(Long productId, Throwable t) {
+        throw new ProductServiceUnavailableException(
+                "Product service is unavailable (circuit breaker)", t);
+    }
 
+
+    @CircuitBreaker(name = "productService", fallbackMethod = "reserveStockFallback")
     public void reserveStock(Long productId, Integer quantity) {
         try {
             restClient.post()
@@ -49,6 +57,11 @@ public class ProductServiceClient {
                     "Product service is unavailable", ex);
         }
 
+    }
+
+    private void reserveStockFallback(Long productId, Integer quantity, Throwable t) {
+        throw new ProductServiceUnavailableException(
+                "Product service is unavailable (circuit breaker)", t);
     }
 
 }
