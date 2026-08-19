@@ -19,3 +19,7 @@ spring:
 
 server:
   port: 8082
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"

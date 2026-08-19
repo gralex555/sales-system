@@ -7,12 +7,14 @@ import com.sales.product.entity.Product;
 import com.sales.product.entity.ReservationResult;
 import com.sales.product.exception.ProductNotFoundException;
 import com.sales.product.repository.ProductRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 public class ProductService {
     private final ProductRepository productRepository;
 
@@ -54,6 +56,7 @@ public class ProductService {
 
     @Transactional
     public ReservationResult reserveStock(Long productId, Integer quantity) {
+        log.info("Reserving {} units of product {}", quantity, productId);
         // проверим, что товар вообще существует
         if (!productRepository.existsById(productId)) {
             throw new ProductNotFoundException(productId);
@@ -61,9 +64,13 @@ public class ProductService {
 
         int updated = productRepository.reserveStock(productId, quantity);
 
-        return updated > 0
+        ReservationResult result = updated > 0
                 ? ReservationResult.SUCCESS
                 : ReservationResult.INSUFFICIENT_STOCK;
+
+        log.info("Reservation result for product {}: {}", productId, result);
+
+        return result;
     }
 
 }

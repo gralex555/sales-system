@@ -51,3 +51,7 @@ management:
   health:
     circuitbreakers:
       enabled: true
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"

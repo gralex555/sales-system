@@ -11,6 +11,7 @@ import com.sales.order.entity.OrderItem;
 import com.sales.order.entity.OrderStatus;
 import com.sales.order.exception.OrderNotFoundException;
 import com.sales.order.repository.OrderRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@Slf4j
 public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductServiceClient productServiceClient;
@@ -32,6 +34,7 @@ public class OrderService {
     }
 
     public OrderResponse createOrder(CreateOrderRequest request) {
+        log.info("Creating order for customer {}", request.getCustomerId());
         Order order = new Order();
         order.setCustomerId(request.getCustomerId());
         order.setCreatedAt(LocalDateTime.now());
@@ -61,6 +64,7 @@ public class OrderService {
         order.setStatus(OrderStatus.RESERVED);
 
         Order savedOrder = orderRepository.save(order);
+        log.info("Order created with id {} and status {}", savedOrder.getId(), savedOrder.getStatus());
         return mapToResponse(savedOrder);
     }
 
