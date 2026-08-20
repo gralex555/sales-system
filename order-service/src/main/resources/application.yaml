@@ -19,3 +19,39 @@ spring:
 
 server:
   port: 8081
+
+services:
+  product:
+    url: ${PRODUCT_SERVICE_URL:http://localhost:8082}
+    connect-timeout: 2s
+    read-timeout: 5s
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      productService:
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 5
+        sliding-window-size: 10
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - com.sales.order.exception.InsufficientStockException
+          - com.sales.order.exception.ProductNotAvailableException
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"
