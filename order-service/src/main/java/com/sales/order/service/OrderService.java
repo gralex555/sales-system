@@ -40,32 +40,41 @@ public class OrderService {
         order.setCreatedAt(LocalDateTime.now());
 
         BigDecimal totalAmount = BigDecimal.ZERO;    // накопитель суммы
+        List<ReservedItem> reserved = new ArrayList<>();     // память о шагах. Список выполненных резервов
 
-        for (OrderItemRequest itemRequest : request.getItems()) {
+        try {
+            for (OrderItemRequest itemRequest : request.getItems()) {
 
-            ProductInfo product = productServiceClient.getProduct(itemRequest.getProductId());
-            BigDecimal price = product.getPrice();
+                ProductInfo product = productServiceClient.getProduct(itemRequest.getProductId());
+                BigDecimal price = product.getPrice();
 
-            productServiceClient.reserveStock(itemRequest.getProductId(), itemRequest.getQuantity());
+                productServiceClient.reserveStock(itemRequest.getProductId(), itemRequest.getQuantity());
+                reserved.add(new ReservedItem(itemRequest.getProductId(), itemRequest.getQuantity()));
 
-            OrderItem item = new OrderItem();
-            item.setProductId(itemRequest.getProductId());
-            item.setQuantity(itemRequest.getQuantity());
-            item.setPrice(price);
-            item.setOrder(order);
-            order.getItems().add(item);
+                OrderItem item = new OrderItem();
+                item.setProductId(itemRequest.getProductId());
+                item.setQuantity(itemRequest.getQuantity());
+                item.setPrice(price);
+                item.setOrder(order);
+                order.getItems().add(item);
 
-            BigDecimal itemTotal = price.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
-            totalAmount = totalAmount.add(itemTotal);
+                BigDecimal itemTotal = price.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+                totalAmount = totalAmount.add(itemTotal);
 
+            }
+
+            order.setTotalAmount(totalAmount);
+            order.setStatus(OrderStatus.RESERVED);
+
+            Order savedOrder = orderRepository.save(order);
+            log.info("Order created with id {} and status {}", savedOrder.getId(), savedOrder.getStatus());
+            return mapToResponse(savedOrder);
+
+        } catch (Exception e) {
+            log.warn("Order creation failed, compensating {} reservations", reserved.size());
+            compensateReservations(reserved);
+            throw e;
         }
-
-        order.setTotalAmount(totalAmount);
-        order.setStatus(OrderStatus.RESERVED);
-
-        Order savedOrder = orderRepository.save(order);
-        log.info("Order created with id {} and status {}", savedOrder.getId(), savedOrder.getStatus());
-        return mapToResponse(savedOrder);
     }
 
     private OrderResponse mapToResponse(Order order) {
@@ -98,5 +107,20 @@ public class OrderService {
     public Page<OrderResponse> getAllOrders(Pageable pageable) {
         return orderRepository.findAll(pageable)
                 .map(this::mapToResponse);
+    }
+
+    private void compensateReservations(List<ReservedItem> reserved) {
+
+        for (int i = reserved.size() - 1; i >= 0; i--) {
+            ReservedItem item = reserved.get(i);
+            try {
+                productServiceClient.releaseStock(item.productId(), item.quantity());
+                log.info("Compensated reservation: product {} x{}",
+                        item.productId(), item.quantity());
+            } catch (Exception e) {
+                log.error("FAILED to compensate reservation: product {} x{}. Manual intervention required.",
+                        item.productId(), item.quantity(), e);
+            }
+        }
     }
 }

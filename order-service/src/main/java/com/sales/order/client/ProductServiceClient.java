@@ -1,6 +1,7 @@
 package com.sales.order.client;
 
 import com.sales.order.client.dto.ProductInfo;
+import com.sales.order.client.dto.ReleaseStockRequest;
 import com.sales.order.client.dto.ReserveStockRequest;
 import com.sales.order.exception.InsufficientStockException;
 import com.sales.order.exception.ProductNotAvailableException;
@@ -71,6 +72,14 @@ public class ProductServiceClient {
         }
         throw new ProductServiceUnavailableException(
                 "Product service is unavailable (circuit breaker)", t);
+    }
+
+    public void releaseStock(Long productId, Integer quantity) {
+        restClient.post()
+                .uri("/api/v1/products/{id}/release", productId)
+                .body(new ReleaseStockRequest(quantity))
+                .retrieve()
+                .toBodilessEntity();
     }
 
 }
