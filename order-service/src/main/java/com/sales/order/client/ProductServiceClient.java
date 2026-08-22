@@ -35,6 +35,9 @@ public class ProductServiceClient {
     }
 
     private ProductInfo getProductFallback(Long productId, Throwable t) {
+        if (t instanceof ProductNotAvailableException) {
+            throw (ProductNotAvailableException) t;
+        }
         throw new ProductServiceUnavailableException(
                 "Product service is unavailable (circuit breaker)", t);
     }
@@ -60,6 +63,12 @@ public class ProductServiceClient {
     }
 
     private void reserveStockFallback(Long productId, Integer quantity, Throwable t) {
+        if (t instanceof InsufficientStockException) {
+            throw (InsufficientStockException) t;
+        }
+        if (t instanceof ProductNotAvailableException) {
+            throw (ProductNotAvailableException) t;
+        }
         throw new ProductServiceUnavailableException(
                 "Product service is unavailable (circuit breaker)", t);
     }

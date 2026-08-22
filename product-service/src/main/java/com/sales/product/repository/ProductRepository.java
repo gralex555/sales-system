@@ -14,4 +14,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             "    p.quantityReserved = p.quantityReserved + :quantity " +
             "WHERE p.id = :productId AND p.quantityAvailable >= :quantity")
     int reserveStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
+
+    @Modifying
+    @Query("UPDATE Product p " +
+            "SET p.quantityAvailable = p.quantityAvailable + :qty, " +
+            "    p.quantityReserved  = p.quantityReserved  - :qty " +
+            "WHERE p.id = :productId AND p.quantityReserved >= :qty")
+    int releaseStock(@Param("productId") Long productId, @Param("qty") Integer qty);
 }

@@ -2,6 +2,7 @@ package com.sales.product.controller;
 
 import com.sales.product.dto.CreateProductRequest;
 import com.sales.product.dto.ProductResponse;
+import com.sales.product.dto.ReleaseStockRequest;
 import com.sales.product.dto.ReserveStockRequest;
 import com.sales.product.entity.ReservationResult;
 import com.sales.product.service.ProductService;
@@ -64,5 +65,20 @@ public class ProductController {
             return ResponseEntity.ok().build();
         }
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
+
+    @Operation(summary = "Release reserved stock")
+    @ApiResponse(responseCode = "200", description = "Stock released")
+    @ApiResponse(responseCode = "409", description = "Not enough reserved")
+    @ApiResponse(responseCode = "404", description = "Product not found")
+    @PostMapping("/{id}/release")
+    public ResponseEntity<Void> releaseStock(
+            @PathVariable Long id,
+            @Valid @RequestBody ReleaseStockRequest request) {
+
+        productService.releaseStock(id, request.getQuantity());
+
+        return ResponseEntity.ok().build();
+
     }
 }

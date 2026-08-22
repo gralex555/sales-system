@@ -5,6 +5,7 @@ import com.sales.product.dto.ProductResponse;
 import com.sales.product.entity.Product;
 
 import com.sales.product.entity.ReservationResult;
+import com.sales.product.exception.InsufficientReservationException;
 import com.sales.product.exception.ProductNotFoundException;
 import com.sales.product.repository.ProductRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -71,6 +72,23 @@ public class ProductService {
         log.info("Reservation result for product {}: {}", productId, result);
 
         return result;
+    }
+
+    @Transactional
+    public void releaseStock(Long productId, Integer quantity) {
+        log.info("Releasing {} units of product {}", quantity, productId);
+
+        if (!productRepository.existsById(productId)) {
+            throw new ProductNotFoundException(productId);
+        }
+
+        int updated = productRepository.releaseStock(productId, quantity);
+
+        if (updated == 0) {
+            throw new InsufficientReservationException(productId, quantity);
+        }
+
+        log.info("Released {} units of product {}", quantity, productId);
     }
 
 }

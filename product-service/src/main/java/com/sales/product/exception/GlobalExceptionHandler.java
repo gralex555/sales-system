@@ -66,4 +66,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
+    @ExceptionHandler(InsufficientReservationException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientReservation(InsufficientReservationException ex,
+        HttpServletRequest request) {
+
+        log.error("Release failed: {}", ex.getMessage());
+
+        ErrorResponse error = new ErrorResponse();
+        error.setTimestamp(LocalDateTime.now());
+        error.setStatus(HttpStatus.CONFLICT.value());  // 409
+        error.setError("Conflict");  // 409
+        error.setMessage(ex.getMessage());
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        // 409 Conflict - запрос корректен, но текущее состояние ресурса не позволяет его выполнить
+    }
+
 }
