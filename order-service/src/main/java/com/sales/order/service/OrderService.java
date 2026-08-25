@@ -1,6 +1,8 @@
 package com.sales.order.service;
 
+import com.sales.order.client.PaymentServiceClient;
 import com.sales.order.client.ProductServiceClient;
+import com.sales.order.client.dto.PaymentInfo;
 import com.sales.order.client.dto.ProductInfo;
 import com.sales.order.dto.CreateOrderRequest;
 import com.sales.order.dto.OrderItemRequest;
@@ -10,6 +12,7 @@ import com.sales.order.entity.Order;
 import com.sales.order.entity.OrderItem;
 import com.sales.order.entity.OrderStatus;
 import com.sales.order.exception.OrderNotFoundException;
+import com.sales.order.exception.PaymentDeclinedException;
 import com.sales.order.repository.OrderRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -26,11 +29,14 @@ import java.util.List;
 public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductServiceClient productServiceClient;
+    private final PaymentServiceClient paymentServiceClient;
 
     public OrderService(OrderRepository orderRepository,
-                        ProductServiceClient productServiceClient) {
+                        ProductServiceClient productServiceClient,
+                        PaymentServiceClient paymentServiceClient) {
         this.orderRepository = orderRepository;
         this.productServiceClient = productServiceClient;
+        this.paymentServiceClient = paymentServiceClient;
     }
 
     public OrderResponse createOrder(CreateOrderRequest request) {
@@ -42,6 +48,8 @@ public class OrderService {
         BigDecimal totalAmount = BigDecimal.ZERO;    // накопитель суммы
         List<ReservedItem> reserved = new ArrayList<>();     // память о шагах. Список выполненных резервов
 
+        Long paymentId = null;
+        Order savedOrder = null;
         try {
             for (OrderItemRequest itemRequest : request.getItems()) {
 
@@ -65,15 +73,51 @@ public class OrderService {
 
             order.setTotalAmount(totalAmount);
             order.setStatus(OrderStatus.RESERVED);
+            savedOrder = orderRepository.save(order);
 
-            Order savedOrder = orderRepository.save(order);
+            PaymentInfo payment = paymentServiceClient.processPayment(savedOrder.getId(), totalAmount);
+            paymentId = payment.getId();                          // запомнили для компенсации
+
+            if ("FAILED".equals(payment.getStatus())) {
+                throw new PaymentDeclinedException(payment.getFailureReason());
+            }
+
+            savedOrder.setStatus(OrderStatus.CONFIRMED);
+            savedOrder = orderRepository.save(savedOrder);
             log.info("Order created with id {} and status {}", savedOrder.getId(), savedOrder.getStatus());
             return mapToResponse(savedOrder);
 
         } catch (Exception e) {
-            log.warn("Order creation failed, compensating {} reservations", reserved.size());
-            compensateReservations(reserved);
+            log.warn("Order creation failed, compensating");
+
+            if (paymentId != null) {
+                compensatePayment(paymentId);           // 1. деньги (последний шаг)
+            }
+            compensateReservations(reserved);           // 2. товар
+            if (savedOrder != null) {
+                compensateOrder(savedOrder);            // 3. заказ (первый шаг)
+            }
+
             throw e;
+        }
+    }
+
+    private void compensatePayment(Long paymentId) {
+        try {
+            paymentServiceClient.refundPayment(paymentId);
+            log.info("Compensated payment {}", paymentId);
+        } catch (Exception e) {
+            log.error("FAILED to compensate payment {}. Manual intervention required.", paymentId, e);
+        }
+    }
+
+    private void compensateOrder(Order order) {
+        try {
+            order.setStatus(OrderStatus.CANCELLED);
+            orderRepository.save(order);
+            log.info("Order {} cancelled", order.getId());
+        } catch (Exception e) {
+            log.error("FAILED to cancel order {}", order.getId(), e);
         }
     }
 

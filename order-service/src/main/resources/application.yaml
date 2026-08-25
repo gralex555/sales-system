@@ -25,6 +25,10 @@ services:
     url: ${PRODUCT_SERVICE_URL:http://localhost:8082}
     connect-timeout: 2s
     read-timeout: 5s
+  payment:
+    url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+    connect-timeout: 2s
+    read-timeout: 5s
 
 resilience4j:
   circuitbreaker:
