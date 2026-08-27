@@ -12,12 +12,15 @@ import com.sales.order.entity.Order;
 import com.sales.order.entity.OrderItem;
 import com.sales.order.entity.OrderStatus;
 import com.sales.order.exception.OrderNotFoundException;
+import com.sales.order.exception.OrderNotPayableException;
 import com.sales.order.exception.PaymentDeclinedException;
 import com.sales.order.repository.OrderRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -30,13 +33,16 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductServiceClient productServiceClient;
     private final PaymentServiceClient paymentServiceClient;
+    private final int reservationHours;
 
     public OrderService(OrderRepository orderRepository,
                         ProductServiceClient productServiceClient,
-                        PaymentServiceClient paymentServiceClient) {
+                        PaymentServiceClient paymentServiceClient,
+                        @Value("${order.reservation-hours:48}") int reservationHours) {
         this.orderRepository = orderRepository;
         this.productServiceClient = productServiceClient;
         this.paymentServiceClient = paymentServiceClient;
+        this.reservationHours = reservationHours;
     }
 
     public OrderResponse createOrder(CreateOrderRequest request) {
@@ -48,8 +54,6 @@ public class OrderService {
         BigDecimal totalAmount = BigDecimal.ZERO;    // накопитель суммы
         List<ReservedItem> reserved = new ArrayList<>();     // память о шагах. Список выполненных резервов
 
-        Long paymentId = null;
-        Order savedOrder = null;
         try {
             for (OrderItemRequest itemRequest : request.getItems()) {
 
@@ -72,34 +76,44 @@ public class OrderService {
             }
 
             order.setTotalAmount(totalAmount);
-            order.setStatus(OrderStatus.RESERVED);
-            savedOrder = orderRepository.save(order);
+            order.setStatus(OrderStatus.CREATED);
+            order.setReservedUntil(LocalDateTime.now().plusHours(reservationHours));
 
-            PaymentInfo payment = paymentServiceClient.processPayment(savedOrder.getId(), totalAmount);
-            paymentId = payment.getId();                          // запомнили для компенсации
-
-            if ("FAILED".equals(payment.getStatus())) {
-                throw new PaymentDeclinedException(payment.getFailureReason());
-            }
-
-            savedOrder.setStatus(OrderStatus.CONFIRMED);
-            savedOrder = orderRepository.save(savedOrder);
-            log.info("Order created with id {} and status {}", savedOrder.getId(), savedOrder.getStatus());
+            Order savedOrder = orderRepository.save(order);
+            log.info("Order {} created, reserved until {}", savedOrder.getId(), savedOrder.getReservedUntil());
             return mapToResponse(savedOrder);
 
         } catch (Exception e) {
-            log.warn("Order creation failed, compensating");
-
-            if (paymentId != null) {
-                compensatePayment(paymentId);           // 1. деньги (последний шаг)
-            }
-            compensateReservations(reserved);           // 2. товар
-            if (savedOrder != null) {
-                compensateOrder(savedOrder);            // 3. заказ (первый шаг)
-            }
-
+            log.warn("Order creation failed, compensating {} reservations", reserved.size());
+            compensateReservations(reserved);
             throw e;
         }
+    }
+
+    @Transactional
+    public OrderResponse payOrder(Long orderId) {
+        log.info("Processing payment for order {}", orderId);
+
+        Order order = orderRepository.findByIdWithItems(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (order.getStatus() != OrderStatus.CREATED) {
+            throw new OrderNotPayableException(orderId, order.getStatus());
+        }
+
+        PaymentInfo payment = paymentServiceClient.processPayment(orderId, order.getTotalAmount());
+
+        if ("FAILED".equals(payment.getStatus())) {
+            log.warn("Payment declined for order {}: {}", orderId, payment.getFailureReason());
+            throw new PaymentDeclinedException(payment.getFailureReason());
+        }
+
+        order.setStatus(OrderStatus.PAID);
+        order.setUpdatedAt(LocalDateTime.now());
+        Order savedOrder = orderRepository.save(order);
+
+        log.info("Order {} paid successfully", orderId);
+        return mapToResponse(savedOrder);
     }
 
     private void compensatePayment(Long paymentId) {
@@ -128,6 +142,7 @@ public class OrderService {
         response.setStatus(order.getStatus());
         response.setTotalAmount(order.getTotalAmount());
         response.setCreatedAt(order.getCreatedAt());
+        response.setReservedUntil(order.getReservedUntil());
 
         List<OrderItemResponse> itemResponses = new ArrayList<>();
         for (OrderItem item : order.getItems()) {
@@ -135,6 +150,7 @@ public class OrderService {
             itemResponse.setProductId(item.getProductId());
             itemResponse.setQuantity(item.getQuantity());
             itemResponse.setPrice(item.getPrice());
+
             itemResponses.add(itemResponse);
         }
         response.setItems(itemResponses);

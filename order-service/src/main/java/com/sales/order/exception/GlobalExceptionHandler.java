@@ -144,4 +144,19 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     } // 409
+
+    @ExceptionHandler(OrderNotPayableException.class)
+    public ResponseEntity<ErrorResponse> handleOrderNotPayable(
+            OrderNotPayableException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse error = new ErrorResponse();
+        error.setTimestamp(LocalDateTime.now());
+        error.setStatus(HttpStatus.CONFLICT.value());
+        error.setError("Conflict");
+        error.setMessage(ex.getMessage());
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    } // 409
 }

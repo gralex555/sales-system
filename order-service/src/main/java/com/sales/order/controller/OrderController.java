@@ -46,4 +46,14 @@ public class OrderController {
         Page<OrderResponse> responses = orderService.getAllOrders(pageable);
         return ResponseEntity.ok(responses);
     }
+
+    @Operation(summary = "Pay for an order")
+    @ApiResponse(responseCode = "200", description = "Order paid")
+    @ApiResponse(responseCode = "404", description = "Order not found")
+    @ApiResponse(responseCode = "409", description = "Order cannot be paid or payment declined")
+    @PostMapping("/{id}/pay")
+    public ResponseEntity<OrderResponse> payOrder(@PathVariable Long id) {
+        OrderResponse response = orderService.payOrder(id);
+        return ResponseEntity.ok(response);
+    }
 }

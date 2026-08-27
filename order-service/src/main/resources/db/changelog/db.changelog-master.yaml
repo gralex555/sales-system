@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/changes/001-create-orders.sql
   - include:
       file: db/changelog/changes/002-create-order-items.sql
+  - include:
+      file: db/changelog/changes/003-add-reservation-and-migrate-statuses.sql
