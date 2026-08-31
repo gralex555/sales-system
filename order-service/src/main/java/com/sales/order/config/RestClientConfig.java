@@ -39,4 +39,30 @@ public class RestClientConfig {
                 })
                 .build();
     }  // requestInterceptor - перехватчик исходящих запросов. Перед отправкой достаёт ID из MDC и кладёт в заголовок.
+
+    @Bean
+    public RestClient paymentRestClient(
+            @Value("${services.payment.url}") String paymentServiceUrl,
+            @Value("${services.payment.connect-timeout:2s}") Duration connectTimeout,
+            @Value("${services.payment.read-timeout:5s}") Duration readTimeout) {
+
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(connectTimeout)
+                .build();
+
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(readTimeout);
+
+        return RestClient.builder()
+                .baseUrl(paymentServiceUrl)
+                .requestFactory(requestFactory)
+                .requestInterceptor((request, body, execution) -> {
+                    String correlationId = MDC.get("correlationId");
+                    if (correlationId != null) {
+                        request.getHeaders().add(CorrelationIdFilter.CORRELATION_ID_HEADER, correlationId);
+                    }
+                    return execution.execute(request, body);
+                })
+                .build();
+    }
 }

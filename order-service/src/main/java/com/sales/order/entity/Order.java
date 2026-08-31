@@ -27,6 +27,9 @@ public class Order {
     @Column(nullable = false)
     private OrderStatus status;
 
+    @Column
+    private LocalDateTime reservedUntil;
+
     @Column(nullable = false)
     private BigDecimal totalAmount;    // сумма заказа
 
