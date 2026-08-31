@@ -62,3 +62,5 @@ logging:
 
 order:
   reservation-hours: 48
+  expiry-check-interval-ms: 60000      # раз в минуту (для разработки)
+  expiry-batch-size: 100
