@@ -10,7 +10,7 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
@@ -19,11 +19,6 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: all
-      retries: 3
 
 server:
   port: 8081
@@ -76,3 +71,7 @@ order:
   reservation-hours: 48
   expiry-check-interval-ms: 60000      # раз в минуту (для разработки)
   expiry-batch-size: 100
+
+outbox:
+  batch-size: 100
+  publish-interval-ms: 1000

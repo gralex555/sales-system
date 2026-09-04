@@ -15,7 +15,6 @@ import com.sales.order.event.OrderPaidEvent;
 import com.sales.order.exception.OrderNotFoundException;
 import com.sales.order.exception.OrderNotPayableException;
 import com.sales.order.exception.PaymentDeclinedException;
-import com.sales.order.messaging.OrderEventPublisher;
 import com.sales.order.repository.OrderRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,19 +34,22 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductServiceClient productServiceClient;
     private final PaymentServiceClient paymentServiceClient;
+    private final OutboxService outboxService;
     private final int reservationHours;
-    private final OrderEventPublisher eventPublisher;
+    private final String orderPaidTopic;
 
     public OrderService(OrderRepository orderRepository,
                         ProductServiceClient productServiceClient,
                         PaymentServiceClient paymentServiceClient,
-                        OrderEventPublisher eventPublisher,
-                        @Value("${order.reservation-hours:48}") int reservationHours) {
+                        OutboxService outboxService,
+                        @Value("${order.reservation-hours:48}") int reservationHours,
+                        @Value("${kafka.topics.order-paid:order-paid}") String orderPaidTopic) {
         this.orderRepository = orderRepository;
         this.productServiceClient = productServiceClient;
         this.paymentServiceClient = paymentServiceClient;
-        this.eventPublisher = eventPublisher;
+        this.outboxService = outboxService;
         this.reservationHours = reservationHours;
+        this.orderPaidTopic = orderPaidTopic;
     }
 
     public OrderResponse createOrder(CreateOrderRequest request) {
@@ -116,9 +118,12 @@ public class OrderService {
         order.setStatus(OrderStatus.PAID);
         order.setUpdatedAt(LocalDateTime.now());
         Order savedOrder = orderRepository.save(order);
+        OrderPaidEvent event = OrderPaidEvent.of(
+                savedOrder.getId(),
+                savedOrder.getCustomerId(),
+                savedOrder.getTotalAmount());
 
-        eventPublisher.publishOrderPaid(
-                OrderPaidEvent.of(savedOrder.getId(), savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
+        outboxService.save(savedOrder.getId(), "ORDER_PAID", orderPaidTopic, event);
 
         log.info("Order {} paid successfully", orderId);
         return mapToResponse(savedOrder);

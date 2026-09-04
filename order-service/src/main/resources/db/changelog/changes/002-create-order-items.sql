@@ -12,4 +12,4 @@ CREATE TABLE order_items (
         REFERENCES orders(id)
         ON DELETE CASCADE
 );
---rollback DROP TABLE orders_items;
+--rollback DROP TABLE order_items;
