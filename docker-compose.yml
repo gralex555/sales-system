@@ -35,6 +35,18 @@ services:
     volumes:
       - payment-db-data:/var/lib/postgresql/data
 
+  notification-db:
+    image: postgres:16
+    container_name: notification-db
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: notification_user
+      POSTGRES_PASSWORD: notification_pass
+    ports:
+      - "15435:5432"
+    volumes:
+      - notification-db-data:/var/lib/postgresql/data
+
   kafka:
     image: apache/kafka:3.9.0
     container_name: kafka
@@ -59,3 +71,4 @@ volumes:
   order-db-data:
   product-db-data:
   payment-db-data:
+  notification-db-data:
