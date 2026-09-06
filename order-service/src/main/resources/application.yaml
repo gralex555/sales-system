@@ -10,15 +10,22 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
 server:
   port: 8081
+
+kafka:
+  topics:
+    order-paid: order-paid
 
 services:
   product:
@@ -64,3 +71,11 @@ order:
   reservation-hours: 48
   expiry-check-interval-ms: 60000      # раз в минуту (для разработки)
   expiry-batch-size: 100
+
+outbox:
+  batch-size: 100
+  publish-interval-ms: 1000
+  cleanup:
+    retention-days: 7
+    batch-size: 1000
+    cron: "0 0 3 * * *"

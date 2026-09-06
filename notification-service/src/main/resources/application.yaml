@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: jdbc:postgresql://localhost:15435/notification_db
+    username: ${DB_USERNAME:notification_user}
+    password: ${DB_PASSWORD:notification_pass}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+server:
+  port: 8084
+
+kafka:
+  topics:
+    order-paid: order-paid
+  consumer:
+    group-id: notification-group
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"
+
+processed-event:
+  cleanup:
+    retention-days: 7
+    batch-size: 1000
+    cron: "0 30 3 * * *"
