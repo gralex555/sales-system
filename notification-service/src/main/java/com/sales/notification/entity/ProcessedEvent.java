@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 public class ProcessedEvent {
 
     @Id
+    // Идентификатор приходит извне, из события
     @Column(length = 100)
     private String eventId;
 
