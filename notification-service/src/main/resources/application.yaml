@@ -28,3 +28,9 @@ kafka:
 logging:
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"
+
+processed-event:
+  cleanup:
+    retention-days: 7
+    batch-size: 1000
+    cron: "0 30 3 * * *"

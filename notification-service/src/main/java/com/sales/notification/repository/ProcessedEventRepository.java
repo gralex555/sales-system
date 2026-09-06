@@ -18,4 +18,13 @@ public interface ProcessedEventRepository extends JpaRepository<ProcessedEvent, 
     int insertIfNotExists(@Param("eventId") String eventId,
                           @Param("eventType") String eventType,
                           @Param("processedAt") LocalDateTime processedAt);
+
+    @Modifying
+    @Query(value = "DELETE FROM processed_event WHERE event_id IN (" +
+            "SELECT event_id FROM processed_event " +
+            "WHERE processed_at < :threshold " +
+            "LIMIT :batchSize)",
+            nativeQuery = true)
+    int deleteOlderThan(@Param("threshold") LocalDateTime threshold,
+                        @Param("batchSize") int batchSize);
 }
