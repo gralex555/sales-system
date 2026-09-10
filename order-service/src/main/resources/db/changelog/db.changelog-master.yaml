@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/changes/003-add-reservation-and-migrate-statuses.sql
   - include:
       file: db/changelog/changes/004-create-outbox.sql
+  - include:
+      file: db/changelog/changes/005-add-product-name.sql
