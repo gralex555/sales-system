@@ -47,6 +47,18 @@ services:
     volumes:
       - notification-db-data:/var/lib/postgresql/data
 
+  analytics-db:
+    image: postgres:16
+    container_name: analytics-db
+    environment:
+      POSTGRES_DB: analytics_db
+      POSTGRES_USER: analytics_user
+      POSTGRES_PASSWORD: analytics_pass
+    ports:
+      - "15436:5432"
+    volumes:
+      - analytics-db-data:/var/lib/postgresql/data
+
   kafka:
     image: apache/kafka:3.9.0
     container_name: kafka
@@ -72,3 +84,4 @@ volumes:
   product-db-data:
   payment-db-data:
   notification-db-data:
+  analytics-db-data:
