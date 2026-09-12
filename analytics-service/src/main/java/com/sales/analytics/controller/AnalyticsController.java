@@ -1,5 +1,6 @@
 package com.sales.analytics.controller;
 
+import com.sales.analytics.dto.CustomerSalesResponse;
 import com.sales.analytics.dto.ProductSalesResponse;
 import com.sales.analytics.dto.SalesSummaryResponse;
 import com.sales.analytics.service.AnalyticsService;
@@ -44,5 +45,15 @@ public class AnalyticsController {
             @RequestParam(defaultValue = "10") int limit) {
 
         return ResponseEntity.ok(analyticsService.getTopProducts(from, to, limit));
+    }
+
+    @Operation(summary = "Top customers by revenue")
+    @GetMapping("/top-customers")
+    public ResponseEntity<List<CustomerSalesResponse>> getTopCustomers(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        return ResponseEntity.ok(analyticsService.getTopCustomers(from, to, limit));
     }
 }

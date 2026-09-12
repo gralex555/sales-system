@@ -1,5 +1,6 @@
 package com.sales.analytics.service;
 
+import com.sales.analytics.dto.CustomerSalesResponse;
 import com.sales.analytics.dto.ProductSalesResponse;
 import com.sales.analytics.dto.SalesSummaryResponse;
 import com.sales.analytics.repository.SalesItemRepository;
@@ -48,6 +49,17 @@ public class AnalyticsService {
                 .map(p -> new ProductSalesResponse(
                         p.getProductId(), p.getProductName(),
                         p.getTotalQuantity(), p.getTotalRevenue()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerSalesResponse> getTopCustomers(LocalDateTime from, LocalDateTime to, int limit) {
+        log.info("Building top {} customers from {} to {}", limit, from, to);
+
+        return salesOrderRepository.getTopCustomers(from, to, PageRequest.of(0, limit))
+                .stream()
+                .map(c -> new CustomerSalesResponse(
+                        c.getCustomerId(), c.getOrderCount(), c.getTotalRevenue()))
                 .toList();
     }
 }
