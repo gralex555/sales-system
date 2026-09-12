@@ -1,9 +1,6 @@
 package com.sales.analytics.service;
 
-import com.sales.analytics.dto.CustomerSalesResponse;
-import com.sales.analytics.dto.ProductQuantityResponse;
-import com.sales.analytics.dto.ProductSalesResponse;
-import com.sales.analytics.dto.SalesSummaryResponse;
+import com.sales.analytics.dto.*;
 import com.sales.analytics.repository.ProductQuantityProjection;
 import com.sales.analytics.repository.SalesItemRepository;
 import com.sales.analytics.repository.SalesOrderRepository;
@@ -13,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -74,5 +72,36 @@ public class AnalyticsService {
         return new ProductQuantityResponse(
                 productId, from, to,
                 sales.getTotalQuantity(), sales.getTotalRevenue());
+    }
+
+    @Transactional(readOnly = true)
+    public SalesComparisonResponse compare(LocalDateTime currentFrom, LocalDateTime currentTo,
+                                           LocalDateTime previousFrom, LocalDateTime previousTo) {
+        log.info("Comparing period {}..{} with {}..{}", currentFrom, currentTo, previousFrom, previousTo);
+
+        SalesSummaryResponse current = getSummary(currentFrom, currentTo);
+        SalesSummaryResponse previous = getSummary(previousFrom, previousTo);
+
+        BigDecimal revenueChange = calculateChangePercent(
+                previous.getTotalRevenue(), current.getTotalRevenue());
+
+        BigDecimal orderCountChange = calculateChangePercent(
+                BigDecimal.valueOf(previous.getOrderCount()),
+                BigDecimal.valueOf(current.getOrderCount()));
+
+        return new SalesComparisonResponse(current, previous, revenueChange, orderCountChange);
+    }
+
+    private BigDecimal calculateChangePercent(BigDecimal oldValue, BigDecimal newValue) {
+        if (oldValue.compareTo(BigDecimal.ZERO) == 0) {
+            return newValue.compareTo(BigDecimal.ZERO) == 0
+                    ? BigDecimal.ZERO
+                    : BigDecimal.valueOf(100);
+        }
+
+        return newValue.subtract(oldValue)
+                .divide(oldValue, 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 }

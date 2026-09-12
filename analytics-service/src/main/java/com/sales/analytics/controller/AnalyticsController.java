@@ -1,9 +1,6 @@
 package com.sales.analytics.controller;
 
-import com.sales.analytics.dto.CustomerSalesResponse;
-import com.sales.analytics.dto.ProductQuantityResponse;
-import com.sales.analytics.dto.ProductSalesResponse;
-import com.sales.analytics.dto.SalesSummaryResponse;
+import com.sales.analytics.dto.*;
 import com.sales.analytics.service.AnalyticsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -63,5 +60,16 @@ public class AnalyticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
 
         return ResponseEntity.ok(analyticsService.getProductSales(productId, from, to));
+    }
+
+    @Operation(summary = "Compare two periods")
+    @GetMapping("/comparison")
+    public ResponseEntity<SalesComparisonResponse> compare(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime currentFrom,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime currentTo,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime previousFrom,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime previousTo) {
+
+        return ResponseEntity.ok(analyticsService.compare(currentFrom, currentTo, previousFrom, previousTo));
     }
 }
