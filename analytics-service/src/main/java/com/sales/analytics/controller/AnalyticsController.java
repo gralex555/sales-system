@@ -1,6 +1,7 @@
 package com.sales.analytics.controller;
 
 import com.sales.analytics.dto.CustomerSalesResponse;
+import com.sales.analytics.dto.ProductQuantityResponse;
 import com.sales.analytics.dto.ProductSalesResponse;
 import com.sales.analytics.dto.SalesSummaryResponse;
 import com.sales.analytics.service.AnalyticsService;
@@ -8,10 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -55,5 +53,15 @@ public class AnalyticsController {
             @RequestParam(defaultValue = "10") int limit) {
 
         return ResponseEntity.ok(analyticsService.getTopCustomers(from, to, limit));
+    }
+
+    @Operation(summary = "Sales of a specific product for period")
+    @GetMapping("/products/{productId}")
+    public ResponseEntity<ProductQuantityResponse> getProductSales(
+            @PathVariable Long productId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+
+        return ResponseEntity.ok(analyticsService.getProductSales(productId, from, to));
     }
 }

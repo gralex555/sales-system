@@ -22,4 +22,14 @@ public interface SalesItemRepository extends JpaRepository<SalesItem, Long> {
     List<ProductSalesProjection> getTopProducts(@Param("from") LocalDateTime from,
                                                 @Param("to") LocalDateTime to,
                                                 Pageable pageable);
+
+
+    @Query("SELECT COALESCE(SUM(i.quantity), 0) AS totalQuantity, " +
+            "COALESCE(SUM(i.quantity * i.price), 0) AS totalRevenue " +
+            "FROM SalesItem i " +
+            "WHERE i.productId = :productId " +
+            "AND i.salesOrder.paidAt >= :from AND i.salesOrder.paidAt < :to")
+    ProductQuantityProjection getProductSales(@Param("productId") Long productId,
+                                              @Param("from") LocalDateTime from,
+                                              @Param("to") LocalDateTime to);
 }

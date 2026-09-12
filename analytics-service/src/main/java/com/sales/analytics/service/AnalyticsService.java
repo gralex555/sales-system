@@ -1,8 +1,10 @@
 package com.sales.analytics.service;
 
 import com.sales.analytics.dto.CustomerSalesResponse;
+import com.sales.analytics.dto.ProductQuantityResponse;
 import com.sales.analytics.dto.ProductSalesResponse;
 import com.sales.analytics.dto.SalesSummaryResponse;
+import com.sales.analytics.repository.ProductQuantityProjection;
 import com.sales.analytics.repository.SalesItemRepository;
 import com.sales.analytics.repository.SalesOrderRepository;
 import com.sales.analytics.repository.SalesSummaryProjection;
@@ -61,5 +63,16 @@ public class AnalyticsService {
                 .map(c -> new CustomerSalesResponse(
                         c.getCustomerId(), c.getOrderCount(), c.getTotalRevenue()))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ProductQuantityResponse getProductSales(Long productId, LocalDateTime from, LocalDateTime to) {
+        log.info("Building sales for product {} from {} to {}", productId, from, to);
+
+        ProductQuantityProjection sales = salesItemRepository.getProductSales(productId, from, to);
+
+        return new ProductQuantityResponse(
+                productId, from, to,
+                sales.getTotalQuantity(), sales.getTotalRevenue());
     }
 }
