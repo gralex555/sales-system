@@ -11,6 +11,7 @@ import com.sales.order.dto.OrderResponse;
 import com.sales.order.entity.Order;
 import com.sales.order.entity.OrderItem;
 import com.sales.order.entity.OrderStatus;
+import com.sales.order.event.OrderItemData;
 import com.sales.order.event.OrderPaidEvent;
 import com.sales.order.exception.OrderNotFoundException;
 import com.sales.order.exception.OrderNotPayableException;
@@ -72,6 +73,7 @@ public class OrderService {
 
                 OrderItem item = new OrderItem();
                 item.setProductId(itemRequest.getProductId());
+                item.setProductName(product.getName());
                 item.setQuantity(itemRequest.getQuantity());
                 item.setPrice(price);
                 item.setOrder(order);
@@ -118,10 +120,14 @@ public class OrderService {
         order.setStatus(OrderStatus.PAID);
         order.setUpdatedAt(LocalDateTime.now());
         Order savedOrder = orderRepository.save(order);
+
+        List<OrderItemData> items = savedOrder.getItems().stream()
+                .map(i -> new OrderItemData(
+                        i.getProductId(), i.getProductName(), i.getQuantity(), i.getPrice()))
+                .toList();
+
         OrderPaidEvent event = OrderPaidEvent.of(
-                savedOrder.getId(),
-                savedOrder.getCustomerId(),
-                savedOrder.getTotalAmount());
+                savedOrder.getId(), savedOrder.getCustomerId(), savedOrder.getTotalAmount(), items);
 
         outboxService.save(savedOrder.getId(), "ORDER_PAID", orderPaidTopic, event);
 
@@ -161,6 +167,7 @@ public class OrderService {
         for (OrderItem item : order.getItems()) {
             OrderItemResponse itemResponse = new OrderItemResponse();
             itemResponse.setProductId(item.getProductId());
+            itemResponse.setProductName(item.getProductName());
             itemResponse.setQuantity(item.getQuantity());
             itemResponse.setPrice(item.getPrice());
 

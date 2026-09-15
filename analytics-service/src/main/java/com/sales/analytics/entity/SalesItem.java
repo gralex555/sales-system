@@ -1,4 +1,4 @@
-package com.sales.order.entity;
+package com.sales.analytics.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -8,17 +8,17 @@ import lombok.Setter;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "order_items")
+@Table(name = "sales_item")
 @Getter
 @Setter
 @NoArgsConstructor
-public class OrderItem {
+public class SalesItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private Long productId;         // какой товар (id из product-service)
+    private Long productId;
 
     @Column(nullable = false)
     private Integer quantity;
@@ -26,10 +26,10 @@ public class OrderItem {
     @Column(nullable = false)
     private BigDecimal price;
 
-    @Column(length = 255)
+    @Column(nullable = false, length = 255)
     private String productName;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false)
-    private Order order;
+    @JoinColumn(name = "sales_order_id", nullable = false)
+    private SalesOrder salesOrder;
 }

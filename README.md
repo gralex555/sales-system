@@ -5,7 +5,7 @@ B2B-система управления онлайн заказами компа
 
 ## Статус
 
-В разработке. Готовы order-service, product-service, payment-service, notification-service
+В разработке. Готовы order-service, product-service, payment-service, notification-service, analytics-service
 
 
 | Сервис | Назначение | Статус |
@@ -14,18 +14,18 @@ B2B-система управления онлайн заказами компа
 | product-service | Товары, резервирование склада | ✅ базовый функционал |
 | payment-service | Оплата, возврат средств | ✅ базовый функционал |
 | notification-service | Уведомления по событиям заказов | ✅ базовый функционал |
-| analytics-service | Отчёты по продажам | ⬜ планируется |
+| analytics-service | Отчёты по продажам | ✅ базовый функционал |
 
 ## Стек
 
-Java 25, Spring Boot 4.1, PostgreSQL 16, **Apache Kafka**, Liquibase, Docker, Maven, Resilience4j, JUnit 5 + Mockito, Testcontainers, springdoc-openapi
+Java 25, Spring Boot 4.1, PostgreSQL 16, Apache Kafka, **Redis**, Liquibase, Docker, Maven, Resilience4j, JUnit 5 + Mockito, Testcontainers, springdoc-openapi
 
 ## Быстрый старт
 
 Требования: Docker, JDK 25
 
 ```bash
-# поднять инфраструктуру (4 базы + Kafka)
+# поднять инфраструктуру (5 баз + Kafka + Redis)
 docker-compose up -d
 
 # запустить сервисы (каждый в своём терминале)
@@ -33,12 +33,14 @@ cd order-service && ./mvnw spring-boot:run
 cd product-service && ./mvnw spring-boot:run
 cd payment-service && ./mvnw spring-boot:run
 cd notification-service && ./mvnw spring-boot:run
+cd analytics-service && ./mvnw spring-boot:run
 ```
 
 order-service: http://localhost:8081 (Swagger: /swagger-ui.html)
 product-service: http://localhost:8082 (Swagger: /swagger-ui.html)
 payment-service: http://localhost:8083 (Swagger: /swagger-ui.html)
 notification-service: http://localhost:8084 (без API, только обработка событий)
+analytics-service: http://localhost:8085 (Swagger: /swagger-ui.html)
 
 ## API (order-service)
 
@@ -61,6 +63,17 @@ notification-service: http://localhost:8084 (без API, только обраб
 | POST | `/api/v1/products/{id}/reserve` | Зарезервировать товар |
 | POST | `/api/v1/products/{id}/release` | Освободить резерв |
 
+## API (analytics-service)
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/analytics/summary` | Выручка, количество заказов, средний чек за период |
+| GET | `/api/v1/analytics/top-products` | Топ товаров по выручке |
+| GET | `/api/v1/analytics/top-customers` | Топ клиентов по выручке |
+| GET | `/api/v1/analytics/products/{productId}` | Продажи конкретного товара за период |
+| GET | `/api/v1/analytics/comparison` | Сравнение двух периодов |
+
+Параметры периода: `?from=2026-09-01T00:00:00&to=2026-09-12T00:00:00`
 
 ## API (payment-service)
 
@@ -83,13 +96,22 @@ notification-service: http://localhost:8084 (без API, только обраб
 3. **Истечение резерва** - если заказ не оплачен за 48 часов, фоновая задача освобождает
    товар и переводит заказ в `CANCELLED`.
 
+4. **Аналитика** — факт оплаты публикуется событием, analytics-service накапливает продажи и отдаёт отчёты: выручка, средний чек, топ товаров и клиентов, сравнение периодов.
+
 Состояния: `CREATED → PAID` или `CREATED → CANCELLED`.
 
 ## Обмен событиями
 
 Синхронные вызовы (REST) используются для шагов Saga, где нужен немедленный ответ: проверка наличия, резервирование, оплата. Асинхронные события через Kafka — для уведомления о свершившихся фактах.
 
-**Топик `order-paid`** - событие об оплаченном заказе. Публикуется order-service, потребляется notification-service. Ключ сообщения — `orderId`, поэтому события одного заказа попадают в одну партицию и обрабатываются по порядку.
+**Топик `order-paid`** — событие об оплаченном заказе. Публикуется order-service.
+Ключ сообщения — `orderId`, поэтому события одного заказа попадают в одну партицию и обрабатываются по порядку.
+
+Потребители:
+- `notification-service` (группа `notification-group`) — отправка уведомления клиенту
+- `analytics-service` (группа `analytics-group`) — накопление данных для отчётов
+
+Разные consumer-группы получают все события независимо, каждая со своим offset. Внутри одной группы событие обрабатывается один раз — это позволяет масштабировать потребителя, запуская несколько экземпляров.
 
 **Топик `order-paid-dlt`** - сообщения, которые не удалось обработать. Содержат исходные данные и заголовки с причиной сбоя: топик, offset, стектрейс.
 
@@ -106,6 +128,7 @@ OutboxScheduler (раз в секунду)
   └── UPDATE outbox SET published = true
        ↓
 notification-service → проверка processed_event → уведомление
+analytics-service    → проверка processed_event → запись продажи
 ```
 
 ## Ключевые решения
@@ -154,6 +177,12 @@ notification-service → проверка processed_event → уведомлен
 
 **Очистка по расписанию** - `order_outbox` и `processed_event` растут бесконечно, поэтому отправленные события и старые записи об обработке удаляются раз в сутки порциями по 1000 строк. Срок хранения — 7 дней, не меньше retention топика Kafka: если удалить записи раньше, повторно пришедшее событие обработается заново.
 
+**Аналитика на собственных данных** - analytics-service не обращается к order-service за подробностями, а накапливает продажи из событий `order-paid`. Событие обогащено позициями заказа, включая название товара на момент продажи: в каталоге товар могут переименовать, но отчёт за прошлый год должен показывать, что продавалось тогда. Денормализация ради независимости от источника.
+
+**Защита от двойного учёта продажи** - помимо идемпотентности потребителя, на `order_id` в таблице продаж стоит уникальный индекс. Ремень безопасности поверх подушки: даже при баге в логике обработки событий выручка не удвоится. Для аналитики достоверность цифр важнее, чем успешная обработка любого события.
+
+**Кэширование отчётов (Redis)** - TTL один час: для оптовых продаж часовое отставание аналитики не влияет на решения, в рознице взял бы меньше. Ключ включает все параметры запроса, иначе отчёты за разные периоды перепутались бы. Сериализация JSON с явным указанием типа на каждый кэш; `activateDefaultTyping` не использую — он записывает имя класса в данные и позволяет восстановить произвольный тип, а это известный вектор небезопасной десериализации. Из-за этого кэшируются только отчёты, возвращающие один объект; списки оставлены без кэша.
+
 ## Тесты
 
 ```bash
@@ -169,6 +198,5 @@ cd product-service && ./mvnw test
 
 ## Что дальше
 
-- Аналитика продаж, кэширование отчётов в Redis
 - Метрики и мониторинг
 - Деплой
