@@ -6,6 +6,7 @@ import com.sales.analytics.repository.SalesItemRepository;
 import com.sales.analytics.repository.SalesOrderRepository;
 import com.sales.analytics.repository.SalesSummaryProjection;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class AnalyticsService {
         this.salesItemRepository = salesItemRepository;
     }
 
+    @Cacheable(value = "summary", key = "#from + '-' + #to")
     @Transactional(readOnly = true)
     public SalesSummaryResponse getSummary(LocalDateTime from, LocalDateTime to) {
         log.info("Building sales summary from {} to {}", from, to);
@@ -40,6 +42,7 @@ public class AnalyticsService {
                 summary.getAverageOrderValue().setScale(2, RoundingMode.HALF_UP));
     }
 
+
     @Transactional(readOnly = true)
     public List<ProductSalesResponse> getTopProducts(LocalDateTime from, LocalDateTime to, int limit) {
         log.info("Building top {} products from {} to {}", limit, from, to);
@@ -52,6 +55,7 @@ public class AnalyticsService {
                 .toList();
     }
 
+
     @Transactional(readOnly = true)
     public List<CustomerSalesResponse> getTopCustomers(LocalDateTime from, LocalDateTime to, int limit) {
         log.info("Building top {} customers from {} to {}", limit, from, to);
@@ -63,6 +67,7 @@ public class AnalyticsService {
                 .toList();
     }
 
+    @Cacheable(value = "productSales", key = "#productId + '-' + #from + '-' + #to")
     @Transactional(readOnly = true)
     public ProductQuantityResponse getProductSales(Long productId, LocalDateTime from, LocalDateTime to) {
         log.info("Building sales for product {} from {} to {}", productId, from, to);
