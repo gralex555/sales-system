@@ -157,6 +157,35 @@ services:
       - kafka
       - redis
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    depends_on:
+      - order-service
+      - product-service
+      - payment-service
+      - notification-service
+      - analytics-service
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   order-db-data:
   product-db-data:
@@ -164,3 +193,5 @@ volumes:
   notification-db-data:
   analytics-db-data:
   redis-data:
+  prometheus-data:
+  grafana-data:

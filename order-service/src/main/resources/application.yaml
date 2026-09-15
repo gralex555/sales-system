@@ -55,13 +55,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,circuitbreakers
+        include: health,info,prometheus,circuitbreakers
   endpoint:
     health:
       show-details: always
-  health:
-    circuitbreakers:
-      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 logging:
   pattern:
