@@ -31,4 +31,4 @@ jobs:
 
       - name: Build ${{ matrix.service }}
         working-directory: ${{ matrix.service }}
-        run: ./mvnw -B package -DskipTests
+        run: ./mvnw -B package
