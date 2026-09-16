@@ -16,31 +16,54 @@ B2B-система управления онлайн заказами компа
 | notification-service | Уведомления по событиям заказов | ✅ базовый функционал |
 | analytics-service | Отчёты по продажам | ✅ базовый функционал |
 
+
+## Архитектура
+
+```
+                    ┌─────────────────┐
+     клиент ───────▶│  order-service  │
+                    │     :8081       │
+                    └────────┬────────┘
+                             │ REST (Saga)
+                 ┌───────────┴───────────┐
+                 ▼                       ▼
+        ┌─────────────────┐    ┌─────────────────┐
+        │ product-service │    │ payment-service │
+        │      :8082      │    │      :8083      │
+        └─────────────────┘    └─────────────────┘
+
+        order-service ──outbox──▶ Kafka [order-paid]
+                                    │
+                        ┌───────────┴───────────┐
+                        ▼                       ▼
+              ┌──────────────────┐   ┌──────────────────┐
+              │  notification    │   │   analytics      │
+              │     :8084        │   │     :8085        │
+              └──────────────────┘   └────────┬─────────┘
+                                              ▼
+                                           Redis
+
+У каждого сервиса своя база PostgreSQL
+```
+
 ## Стек
 
-Java 25, Spring Boot 4.1, PostgreSQL 16, Apache Kafka, **Redis**, Liquibase, Docker, Maven, Resilience4j, JUnit 5 + Mockito, Testcontainers, springdoc-openapi
+Java 21, Spring Boot 4.1, PostgreSQL 16, Apache Kafka, Redis, Liquibase, Docker, Maven, Resilience4j, **Prometheus, Grafana**, JUnit 5 + Mockito, Testcontainers, springdoc-openapi
 
 ## Быстрый старт
 
-Требования: Docker, JDK 25
-
 ```bash
-# поднять инфраструктуру (5 баз + Kafka + Redis)
 docker-compose up -d
-
-# запустить сервисы (каждый в своём терминале)
-cd order-service && ./mvnw spring-boot:run
-cd product-service && ./mvnw spring-boot:run
-cd payment-service && ./mvnw spring-boot:run
-cd notification-service && ./mvnw spring-boot:run
-cd analytics-service && ./mvnw spring-boot:run
 ```
+Поднимает всю систему: пять сервисов, пять баз, Kafka, Redis, Prometheus, Grafana.
 
 order-service: http://localhost:8081 (Swagger: /swagger-ui.html)
 product-service: http://localhost:8082 (Swagger: /swagger-ui.html)
 payment-service: http://localhost:8083 (Swagger: /swagger-ui.html)
 notification-service: http://localhost:8084 (без API, только обработка событий)
 analytics-service: http://localhost:8085 (Swagger: /swagger-ui.html)
+Prometheus http://localhost:9090  метрики
+Grafana  http://localhost:3000  admin/admin 
 
 ## API (order-service)
 
@@ -131,6 +154,17 @@ notification-service → проверка processed_event → уведомлен
 analytics-service    → проверка processed_event → запись продажи
 ```
 
+## Мониторинг
+
+Каждый сервис отдаёт метрики через Spring Boot Actuator в формате Prometheus (`/actuator/prometheus`). Prometheus опрашивает их раз в 15 секунд и хранит историю, Grafana строит графики.
+
+Модель pull: Prometheus сам ходит к сервисам, а не они шлют данные. Сервис не зависит от доступности мониторинга — если Prometheus недоступен, приложение работает как обычно.
+
+Ко всем метрикам добавлена метка `application` с именем сервиса, иначе данные пяти сервисов смешались бы.
+
+Дашборд показывает нагрузку (запросов в секунду), использование heap-памяти и частоту ошибок 5xx.
+
+
 ## Ключевые решения
 
 **Monorepo** - все сервисы в одном репозитории. Один разработчик, проще менять контракты между сервисами и показывать систему целиком. В команде с отдельным владением сервисами выбрал бы multi-repo.
@@ -183,6 +217,10 @@ analytics-service    → проверка processed_event → запись пр�
 
 **Кэширование отчётов (Redis)** - TTL один час: для оптовых продаж часовое отставание аналитики не влияет на решения, в рознице взял бы меньше. Ключ включает все параметры запроса, иначе отчёты за разные периоды перепутались бы. Сериализация JSON с явным указанием типа на каждый кэш; `activateDefaultTyping` не использую — он записывает имя класса в данные и позволяет восстановить произвольный тип, а это известный вектор небезопасной десериализации. Из-за этого кэшируются только отчёты, возвращающие один объект; списки оставлены без кэша.
 
+**Java 21 вместо 25** — начинал на 25, но экосистема за ней не успевает: несовместимости с Testcontainers, Kafka-сериализаторами, Jackson, плюс GitHub Actions её не поддерживает. Понизил до текущей LTS — меньше сюрпризов и ближе к тому, что используется в продакшене.
+
+**Multi-stage Docker-сборка** — jar собирается внутри образа, в финальный слой попадает только JRE и приложение. Сборка не зависит от того, что установлено на машине, а образ не тащит Maven и исходники.
+
 ## Тесты
 
 ```bash
@@ -196,7 +234,14 @@ cd product-service && ./mvnw test
 
 Тесты payment-service и notification-service — в планах.
 
+## CI
+
+GitHub Actions при каждом push: пять сервисов собираются параллельно через matrix, прогоняются тесты.
+
+Integration-тест конкурентного резервирования работает и в CI — Testcontainers поднимает PostgreSQL в Docker прямо на runner'е.
+
 ## Что дальше
 
-- Метрики и мониторинг
-- Деплой
+- Деплой на облачную площадку
+- Автотесты Saga-сценария
+- Distributed tracing

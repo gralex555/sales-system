@@ -2,7 +2,7 @@ spring:
   application:
     name: order-service
   datasource:
-    url: jdbc:postgresql://localhost:15432/order_db
+    url: ${DB_URL:jdbc:postgresql://localhost:15432/order_db}
     username: ${DB_USERNAME:order_user}
     password: ${DB_PASSWORD:order_pass}
     driver-class-name: org.postgresql.Driver
@@ -55,13 +55,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,circuitbreakers
+        include: health,info,prometheus,circuitbreakers
   endpoint:
     health:
       show-details: always
-  health:
-    circuitbreakers:
-      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 logging:
   pattern:
