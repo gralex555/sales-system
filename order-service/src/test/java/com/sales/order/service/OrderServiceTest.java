@@ -8,6 +8,7 @@ import com.sales.order.dto.OrderItemRequest;
 import com.sales.order.dto.OrderResponse;
 import com.sales.order.entity.Order;
 import com.sales.order.entity.OrderStatus;
+import com.sales.order.exception.InsufficientStockException;
 import com.sales.order.exception.OrderNotFoundException;
 import com.sales.order.repository.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class OrderServiceTest {
@@ -87,6 +88,50 @@ public class OrderServiceTest {
         when(orderRepository.findByIdWithItems(nonExistentId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.getOrderById(nonExistentId))
+                .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @Test
+    void shouldReleaseReservedStockWhenSecondItemFails() {
+
+        ProductInfo product = new ProductInfo();
+        product.setId(1L);
+        product.setName("Цемент");
+        product.setPrice(BigDecimal.valueOf(450));
+
+        when(productServiceClient.getProduct(anyLong())).thenReturn(product);
+
+        doNothing()
+                .doThrow(new InsufficientStockException(2L, 5))
+                .when(productServiceClient).reserveStock(anyLong(), anyInt());
+
+        OrderItemRequest item1 = new OrderItemRequest();
+        item1.setProductId(1L);
+        item1.setQuantity(2);
+
+        OrderItemRequest item2 = new OrderItemRequest();
+        item2.setProductId(2L);
+        item2.setQuantity(5);
+
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setCustomerId(42L);
+        request.setItems(List.of(item1, item2));
+
+
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(InsufficientStockException.class);
+
+        verify(productServiceClient, times(1)).releaseStock(1L, 2);
+
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void shouldThrowWhenOrderNotFound() {
+        when(orderRepository.findByIdWithItems(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.getOrderById(999L))
                 .isInstanceOf(OrderNotFoundException.class);
     }
 }
