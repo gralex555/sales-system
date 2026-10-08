@@ -3,6 +3,14 @@
 B2B-система управления онлайн заказами компании по производству и продаже строительных материалов.
 Микросервисная архитектура: приём заказов, резервирование товаров на складе, оплата.
 
+## Демо
+
+product-service развёрнут в Google Cloud:
+**https://product-service-690252605214.us-east1.run.app/swagger-ui.html**
+
+Первый запрос после простоя идёт ~10 секунд — Cloud Run поднимает
+контейнер с нуля (cold start).
+
 ## Статус
 
 В разработке. Готовы order-service, product-service, payment-service, notification-service, analytics-service
@@ -48,7 +56,7 @@ B2B-система управления онлайн заказами компа
 
 ## Стек
 
-Java 21, Spring Boot 4.1, PostgreSQL 16, Apache Kafka, Redis, Liquibase, Docker, Maven, Resilience4j, **Prometheus, Grafana**, JUnit 5 + Mockito, Testcontainers, springdoc-openapi
+Java 21, Spring Boot 4.1, PostgreSQL 16, Apache Kafka, Redis, Liquibase, Docker, Maven, Resilience4j, **Prometheus, Grafana**, JUnit 5 + Mockito, Testcontainers, springdoc-openapi, GCP (Cloud Run, Cloud SQL, Artifact Registry)
 
 ## Быстрый старт
 
@@ -228,20 +236,58 @@ cd order-service && ./mvnw test
 cd product-service && ./mvnw test
 ```
 
-**order-service** — unit-тесты расчёта суммы заказа и обработки отсутствующего заказа (JUnit 5 + Mockito).
+**order-service** - unit-тесты расчёта суммы заказа и обработки отсутствующего заказа (JUnit 5 + Mockito), тест откатa Saga.
 
-**product-service** — integration-тест конкурентного резервирования на Testcontainers: два потока через `CountDownLatch` одновременно резервируют товар в единственном экземпляре, проверяется что успешен ровно один и остаток в базе сходится.
+**product-service** - integration-тест конкурентного резервирования на Testcontainers: два потока через `CountDownLatch` одновременно резервируют товар в единственном экземпляре, проверяется что успешен ровно один и остаток в базе сходится.
 
-Тесты payment-service и notification-service — в планах.
+**payment-service** - unit-тесты возврата платежа: все ветки, включая идемпотентность повторного возврата.
+
+**analytics-service** - integration-тест отчёта по топу товаров на Testcontainers: проверяется группировка и сортировка на реальном PostgreSQL.
+
+Тесты notification-service - в планах.
 
 ## CI
 
 GitHub Actions при каждом push: пять сервисов собираются параллельно через matrix, прогоняются тесты.
 
-Integration-тест конкурентного резервирования работает и в CI — Testcontainers поднимает PostgreSQL в Docker прямо на runner'е.
+Integration-тест конкурентного резервирования работает и в CI - Testcontainers поднимает PostgreSQL в Docker прямо на runner'е.
+
+## Деплой (GCP)
+
+product-service вынесен в Google Cloud как пример полного пути от кода
+до работающего адреса.
+
+Схему в облачной базе накатывает Liquibase при первом старте — те же
+changelog-файлы, что и локально.
+
+**Cloud Run вместо виртуальной машины** - нет запросов, контейнеров ноль
+и оплаты ноль; пришёл запрос, поднимается за секунду. Для сервиса, который
+открывают несколько раз в неделю, ВМ тикала бы круглосуточно. Плата за это —
+cold start на первом запросе после простоя.
+
+**Подключение к базе через Cloud SQL connector, а не по публичному IP** —
+`jdbc:postgresql:///product_db?cloudSqlInstance=...&socketFactory=...`.
+Google монтирует сокет внутрь контейнера, базу не нужно открывать
+в интернет вообще. Для этого добавлена зависимость
+`postgres-socket-factory`: штатный драйвер умеет только TCP.
+
+**Порт из переменной окружения** - `server.port: ${PORT:8082}`. Cloud Run
+сам передаёт `PORT` и ждёт, что приложение слушает именно его. Локально
+переменной нет, берётся 8082.
+
+**`forward-headers-strategy: framework`** - Cloud Run терминирует TLS
+и передаёт в контейнер обычный HTTP. Без этой настройки приложение считало
+себя работающим по HTTP, springdoc генерировал в Swagger адреса с `http://`,
+и браузер блокировал их как смешанный контент. Настройка разрешает доверять
+`X-Forwarded-Proto` от обратного прокси.
+
+**Один инстанс Cloud SQL на несколько баз** (при развёртывании остальных
+сервисов) - тарифицируется инстанс, а не база: пять баз в одном инстансе
+стоят как одна. Локально у каждого сервиса свой контейнер с базой - там
+изоляция важнее экономии. Осознанный компромисс для учебного окружения.
 
 ## Что дальше
 
-- Деплой на облачную площадку
-- Автотесты Saga-сценария
+- Деплой остальных четырёх сервисов
+- Автоматический деплой по push (добавить шаг в GitHub Actions)
 - Distributed tracing
