@@ -29,4 +29,10 @@ public class Product {
     @Column(nullable = false)
     private Integer quantityReserved = 0;
 
+    @Column(name = "certificate_key")
+    private String certificateKey;
+
+    @Column(name = "certificate_filename")
+    private String certificateFilename;
+
 }

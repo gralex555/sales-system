@@ -5,23 +5,31 @@ import com.sales.product.dto.ProductResponse;
 import com.sales.product.entity.Product;
 
 import com.sales.product.entity.ReservationResult;
+import com.sales.product.exception.CertificateNotFoundException;
 import com.sales.product.exception.InsufficientReservationException;
 import com.sales.product.exception.ProductNotFoundException;
 import com.sales.product.repository.ProductRepository;
+import com.sales.product.storage.CertificateStorage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.net.URL;
 
 @Service
 @Slf4j
 public class ProductService {
     private final ProductRepository productRepository;
+    private final CertificateStorage certificateStorage;
 
-    public ProductService(ProductRepository productRepository) {
+    public ProductService(ProductRepository productRepository, CertificateStorage certificateStorage) {
         this.productRepository = productRepository;
+        this.certificateStorage = certificateStorage;
     }
+
 
     public ProductResponse createProduct(CreateProductRequest request) {
         Product product = new Product();
@@ -90,5 +98,46 @@ public class ProductService {
 
         log.info("Released {} units of product {}", quantity, productId);
     }
+
+    @Transactional
+    public void attachCertificate(Long productId, MultipartFile file) {
+        validate(file);
+
+        // проверяем, что товар есть, — до загрузки файла
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
+
+        String key = certificateStorage.upload(productId, file);
+
+        product.setCertificateKey(key);
+        product.setCertificateFilename(file.getOriginalFilename());
+    }
+
+    @Transactional(readOnly = true)
+    public URL getCertificateLink(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
+
+        if (product.getCertificateKey() == null) {
+            throw new CertificateNotFoundException(productId);
+        }
+
+        return certificateStorage.generateDownloadLink(
+                product.getCertificateKey(),
+                product.getCertificateFilename());
+    }
+
+    private void validate(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("Файл пустой");
+        }
+        if (!"application/pdf".equals(file.getContentType())) {
+            throw new IllegalArgumentException("Сертификат принимается только в PDF");
+        }
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new IllegalArgumentException("Файл больше 10 МБ");
+        }
+    }
+
 
 }
