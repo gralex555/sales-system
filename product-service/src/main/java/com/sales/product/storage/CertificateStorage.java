@@ -15,6 +15,8 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 
@@ -57,10 +59,13 @@ public class CertificateStorage {  // класс, который кладет ф
     }
 
     public URL generateDownloadLink(String key, String filename) {
+        String encodedName = URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
         GetObjectRequest getRequest = GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
-                .responseContentDisposition("attachment; filename=\"%s\"".formatted(filename))
+                .responseContentDisposition("attachment; filename*=UTF-8''" + encodedName)
                 .build();
 
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
