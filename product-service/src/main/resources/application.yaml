@@ -16,6 +16,10 @@ spring:
         format_sql: true
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  servlet:
+    multipart:
+      max-file-size: 11MB
+      max-request-size: 10MB
 
 s3:
   endpoint: ${S3_ENDPOINT:http://localhost:4566}
