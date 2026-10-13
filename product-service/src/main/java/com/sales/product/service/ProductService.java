@@ -24,10 +24,12 @@ import java.net.URL;
 public class ProductService {
     private final ProductRepository productRepository;
     private final CertificateStorage certificateStorage;
+    private final ProductCertificateUpdater certificateUpdater;
 
-    public ProductService(ProductRepository productRepository, CertificateStorage certificateStorage) {
+    public ProductService(ProductRepository productRepository, CertificateStorage certificateStorage, ProductCertificateUpdater certificateUpdater) {
         this.productRepository = productRepository;
         this.certificateStorage = certificateStorage;
+        this.certificateUpdater = certificateUpdater;
     }
 
 
@@ -99,18 +101,16 @@ public class ProductService {
         log.info("Released {} units of product {}", quantity, productId);
     }
 
-    @Transactional
     public void attachCertificate(Long productId, MultipartFile file) {
         validate(file);
 
-        // проверяем, что товар есть, — до загрузки файла
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ProductNotFoundException(productId));
+        if (!productRepository.existsById(productId)) {
+            throw new ProductNotFoundException(productId);
+        }
 
         String key = certificateStorage.upload(productId, file);
 
-        product.setCertificateKey(key);
-        product.setCertificateFilename(file.getOriginalFilename());
+        certificateUpdater.saveCertificate(productId, key, file.getOriginalFilename());
     }
 
     @Transactional(readOnly = true)
