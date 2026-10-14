@@ -16,6 +16,9 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -81,6 +84,29 @@ public class CertificateStorageTest {
         ).asByteArray();
 
         assertThat(stored).isEqualTo(content);
+
+    }
+
+    @Test
+    void downloadLinkReturnsSameFile() throws IOException {
+        byte[] content = "содержимое сертификата".getBytes(StandardCharsets.UTF_8);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",                    // имя поля формы
+                "cert.pdf",                // имя файла
+                "application/pdf",         // MIME-тип
+                content);                  // содержимое, byte[]
+
+        String key = storage.upload(42L, file);
+
+        URL link = storage.generateDownloadLink(key, "cert.pdf");
+
+        byte[] downloaded;
+        try (InputStream in = link.openStream()) {
+            downloaded = in.readAllBytes();
+        }
+
+        assertThat(downloaded).isEqualTo(content);
 
     }
 
