@@ -16,6 +16,17 @@ spring:
         format_sql: true
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  servlet:
+    multipart:
+      max-file-size: 11MB
+      max-request-size: 10MB
+
+s3:
+  endpoint: ${S3_ENDPOINT:http://localhost:4566}
+  region: ${S3_REGION:us-east-1}
+  bucket: ${S3_BUCKET:sales-certificates}
+  access-key: ${S3_ACCESS_KEY:test}
+  secret-key: ${S3_SECRET_KEY:test}
 
 server:
   port: ${PORT:8082}

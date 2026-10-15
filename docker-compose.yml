@@ -87,6 +87,18 @@ services:
     volumes:
       - redis-data:/data
 
+  localstack:
+    image: localstack/localstack:3
+    container_name: localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3
+      DEBUG: 0
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - ./localstack-init:/etc/localstack/init/ready.d
+
   order-service:
     build: ./order-service
     container_name: order-service
@@ -195,3 +207,4 @@ volumes:
   redis-data:
   prometheus-data:
   grafana-data:
+  localstack-data:
